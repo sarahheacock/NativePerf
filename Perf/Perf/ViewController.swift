@@ -17,6 +17,24 @@ extension Int {
     }
 }
 
+struct Vial: Equatable {
+    var numberOfBacteria : Int
+    init(_ n:Int) {
+        self.numberOfBacteria = n
+    }
+    
+    static func +(lhs:Vial, rhs:Vial) -> Vial {
+        let total = lhs.numberOfBacteria + rhs.numberOfBacteria
+        return Vial(total)
+    }
+}
+
+//extension Vial : Equatable {
+//    static func ==(lhs:Vial, rhs:Vial) -> Bool {
+//        return lhs.numberOfBacteria == rhs.numberOfBacteria
+//    }
+//}
+
 protocol Flier {
     func fly()
 }
@@ -37,6 +55,23 @@ protocol GenFlier {
     @objc optional var song : String? { get set }
 }
 
+//@propertyWrapper struct DeferredConstant<T> {
+//    private var _value: T? = nil
+//    var wrappedValue: T {
+//        get {
+//            if _value == nil {
+//                fatalError("not yet initialized")
+//            }
+//            return _value!
+//        }
+//        set {
+//            if _value == nil {
+//                _value = newValue
+//            }
+//        }
+//    }
+//}
+
 
 // class protocol can take advantage of special memory managements features that
 // only apply to classes
@@ -51,6 +86,7 @@ class ViewController: UIViewController {
     var imageView: UIImageView!
     var v: MyViewProtocol?
     @IBOutlet var button : UIButton!
+    // @IBOutlet @DeferredConstant var myButton: UIButton!
     
     
     // compile error because UIViewController protocol NSCoding requires
@@ -77,6 +113,7 @@ class ViewController: UIViewController {
     class Dog: Quadruped {
         // private prevents fido.name = "Fido"
         private var name: String
+        var nicName: String
         // let name = "Lucy" would prevent changing at all
         
         // static prop
@@ -115,8 +152,9 @@ class ViewController: UIViewController {
         //     self.name = name
         // }
 
-        required init(name:String = "") {
+        required init(name:String = "", _ nicName: String = "") {
             self.name = name
+            self.nicName = nicName
         }
         
         subscript(ix: String) -> String? {
@@ -681,6 +719,267 @@ class ViewController: UIViewController {
         // if unique set of items and do not care about order
         // could be more space efficient than an array
         let set : Set<Int> = [1, 2, 3, 4, 5]
+        
+        // CHAPTER 5 flow control
+        // conditional binding--if variable equals nil, block skipped
+        let optionalStr: String? = "foo"
+        if let variable = optionalStr {
+            print(variable)
+        }
+        guard let variable = optionalStr else { return }
+        print(variable)
+        
+        let num: Int? = 2
+        switch num {
+        case 1?:
+            print("You have 1 thingy!")
+        case let n?:
+            print("You have \(n) thingies!")
+        case nil: break
+        }
+        
+        switch num {
+        case .none: break
+        case .some(1):
+            print("You have 1 thingy!")
+        case .some(let n):
+            print("You have \(n) thingies!")
+        }
+        
+        switch d {
+        case is NoisyDog:
+            print("You have a noisy dog!")
+        case _:
+            print("You have a dog")
+        }
+
+        // if you just want to extract a value from one enum case
+        // you can use if case
+        
+        // obj c has collapsed ternary to test against nil
+        // use unwrapped val or subbed val
+        // nil coalescing operator
+        let newNum = num ?? 0
+        
+        // can create readonly sequence of numbers on fly (Range)
+        for i in 1...5 {
+            print(i) // 1, 2, 3, 4, 5
+        }
+        
+        // under the hood
+        var iterator = (1...5).makeIterator()
+        while let i = iterator.next() {
+            print(i) // 1, 2, 3, 4, 5
+        }
+        
+        // actually iterating through a copy
+        // safe to mutate
+        var mySet : Set = [1,2,3,4,5]
+        for i in mySet {
+            if i.isMultiple(of:2) {
+                mySet.remove(i)
+            }
+        }
+        print(mySet) // s is now [1,3,5]
+        
+        var dogs : [Dog] = [Dog(name: "rover", "rover"), Dog(name: "fido", "fido")]
+        for var dog in dogs {
+            dog.nicName = dog.nicName.uppercased()
+            print(dog.nicName)
+        }
+        for var dog in dogs {
+            print(dog.nicName)
+        }
+        
+        struct DogStruct {
+            var name : String
+            init(_ n:String) {
+                self.name = n
+            }
+        }
+        // if variable type is a value type,
+        // the variable is also a copy
+        var dogStructs : [DogStruct] = [DogStruct("rover"), DogStruct("fido")]
+        // for var dog in dogStructs {
+        //     dog.name = dog.name.uppercased()
+        //     print(dog.name)
+        // }
+        // have to iterate through indices instread
+        for ix in dogStructs.indices {
+            dogStructs[ix].name = dogStructs[ix].name.uppercased()
+        }
+        for var dog in dogStructs {
+            print(dog.name) // lowercase
+        }
+        
+        // sometimes you need to specify which construct you mean when
+        // you say continue or break
+        struct Primes {
+            static var primes = [2]
+            static func appendNextPrime() {
+                next: for i in (primes.last!+1)... {
+                    let sqrt = Int(Double(i).squareRoot())
+                    for prime in primes.lazy.prefix(while:{$0 <= sqrt}) {
+                        if i.isMultiple(of: prime) {
+                            continue next
+                        }
+                    }
+                    primes.append(i)
+                    return
+                }
+            }
+        }
+        
+        // DEFER STATEMENT
+        // defer when the path of execution leaves curly braces
+        
+        func doSomethingTimeConsuming() {
+            defer {
+                // make sure that this always called before last line of function
+                UIApplication.shared.endIgnoringInteractionEvents()
+            }
+            // stop all user touches from reaching any view of the application
+            UIApplication.shared.beginIgnoringInteractionEvents()
+            // ... do stuff ...
+            return
+            
+            // other stuff
+        }
+        
+        struct Countdown: Sequence, IteratorProtocol {
+            var count: Int
+            mutating func next() -> Int? {
+                if count == 0 {
+                    return nil
+                } else {
+                    // returns count as is before defer
+                    defer { count -= 1 }
+                    return count
+                }
+            }
+        }
+        
+        var countdown = Countdown(count: 1)
+        let newCount = countdown.next()
+        print(countdown) // 0
+        print(newCount) // 1
+        
+        // fatalError can halt entire program
+        // assert is ignore during production build
+        
+        // all declaration are internal by default (globally visible in same module)
+        // in C and obj-C you explicitly have to include or import
+        // object types are only visible inside file
+        // private only inside curly braces
+
+        // must declare module public (can subclass)
+        // open (can override in subclass)
+        
+        // extension have access to private vars
+        
+        // INTROSPECTION
+        // let object display names and values of its properties
+        // instantiate a mirror
+        // The Mirror’s children will then be name–value tuples describing the original object’s properties
+        
+        // OPERATOR
+        // an operator is a function
+        // Swift operators can be overloaded for different types of operand
+
+        let v1 = Vial(500_000)
+        let v2 = Vial(400_000)
+        let v3 = v1 + v2 // only works at top of file
+        print(v3.numberOfBacteria) // 900000
+        
+        // MEMORY MANAGEMENT
+        // memory management is handled automatically in Swift
+        // memory leak when reference types reference eachother
+        func testRetainCycle() {
+            class Dog {
+                var cat : Cat?
+                // weak var cat : Cat?
+                deinit {
+                    print("farewell from Dog")
+                }
+            }
+            class Cat {
+                // unowned has to be const
+                // changing reference d will cause a crash
+                // have to make sure cat instance will outlive dog
+                unowned let dog : Dog
+                init(dog: Dog){ self.dog = dog }
+                // var dog : Dog?
+                // weak var dog : Dog?
+                deinit {
+                    print("farewell from Cat")
+                }
+            }
+            let d = Dog()
+            // let c = Cat()
+            // defer {
+            //     d.cat = nil // fixes issue
+            // }
+            // d.cat = c // create a...
+            // c.dog = d // ...retain cycle
+            
+            let c = Cat(dog: d)
+        }
+        testRetainCycle() // nothing in console :-(
+        // strong reference--dog has reference to cat. Cat will never be destroyed
+        // one of of them has to go first
+        
+        // anonymous functions that refer to the object holding reference
+        // will also cause retention cycle
+        class FunctionHolder {
+            var function : (() -> ())?
+            deinit {
+                print("farewell from FunctionHolder")
+            }
+        }
+        func testFunctionHolder() {
+            let fh = FunctionHolder()
+            // only stored function can raise possibility of retain cycle
+            fh.function = {
+                [weak fh] in // fixes (marks as weak)
+                // fh now marked as optional
+                guard let fh = fh else { return }
+                print(fh)
+            }
+            fh.function?()
+        }
+        testFunctionHolder() // nothing in console
+        // only reference to class type can be weak or unowned
+        
+        // EQUATABLE
+        // == operator can be used
+        // create extension with equatable protocol
+        let vialArr = [v1,v2]
+        guard let vialIndex = vialArr.firstIndex(of:v1) else { return } // Optional wrapping 0
+        print(v1 == vialArr[vialIndex])
+        
+        // will implement == automatically if you just want to equate properties
+        // object type has to be struct or enum
+        
+        // Set, Dictionary, and enum with values are hashtbales
+        // hashtable requires adopter to be equatable
+        struct DogHash : Hashable { // and therefore Equatable
+            let name : String
+            let license : Int
+            let color : UIColor
+            static func ==(lhs:DogHash,rhs:DogHash) -> Bool {
+                return lhs.name == rhs.name && lhs.license == rhs.license
+            }
+            func hash(into hasher: inout Hasher) {
+                name.hash(into:&hasher)
+                license.hash(into:&hasher)
+            }
+        }
+        
+        // key paths store reference to property without accessing property
+        var prop = \Dog.nicName
+        puppy.nicName = "skippy"
+        let whatname = puppy[keyPath:prop]
+        print(whatname)
     }
 }
 
